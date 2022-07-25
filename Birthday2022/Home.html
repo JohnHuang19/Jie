@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birthday2022</title>
+    <script src="../Jquery/jquery-3.4.1.js"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/firebasejs/6.5.0/firebase.js"></script>
+    <script src="./JS/config.js"></script>
+    <link rel=stylesheet type="text/css" href="Home.css">
+
+    <script>
+        var db = firebase.database();//取得資料庫
+        var cvUserName = "Jie";//使用者ID
+        $(document).ready(function(){
+            //給我自己登入的方法
+            if(findGetParameter("User") != null){
+                cvUserName = findGetParameter("User");
+            }
+
+            //登入時間
+            var myDate = new Date();
+            var myTime = myDate.toString();
+            if(location.href.indexOf("http") > -1 && cvUserName!="John"){
+                db.ref("DB2022/EnterTime/").push({
+                    EnterTime: myTime                   
+                })
+            }
+        })
+        /* 取參數 */
+        function findGetParameter(parameterName) {
+            var result = null,
+		        tmp = [];
+            var items = location.search.substr(1).split("&");
+            for (var index = 0; index < items.length; index++) {
+                tmp = items[index].split("=");
+                if (tmp[0] === parameterName) result = decodeURIComponent(tmp[1]);
+            }
+            return result;
+        }
+
+        /* 事件 */
+        window.onscroll = function(){
+            //改變軌道內，需要變化的元素
+            ElementsMove();
+        }
+
+
+        //目前視窗在哪個 track 內
+        function GetCurrentTrack(){
+            var myCurrentPosition = GetCurrentPosition();
+            var myCurrentTrack = 0;
+
+            var myTrack = $(".track");
+            for(var i=0;i<myTrack.length;i++){
+                var wkHead = myTrack[i].offsetTop;
+                var wkTail = wkHead + $(myTrack[i]).height();
+                if(myCurrentPosition >= wkHead && myCurrentPosition < wkTail ){
+                    myCurrentTrack = i + 1; //固定要 +1
+                    break;
+                }
+            }
+            return myCurrentTrack;
+        }
+
+        //取得【目前視窗】的絕對位置
+        function GetCurrentPosition(){
+            var myPosition = window.pageYOffset;
+            return myPosition;
+        }
+
+        //取得【目前軌道開頭】的位置
+        function GetTrackTop(Current_Track){
+            var myPosition = $("#track" + Current_Track).offset().top;
+            return myPosition;
+        }
+
+        //在【目前的軌道】內往下滑多少
+        function TrackMove(Current_Track){
+            var myDiff = GetCurrentPosition() - GetTrackTop(Current_Track);
+            return myDiff;
+        }
+
+        //改變軌道內，需要變化的元素
+        function ElementsMove(){
+            //找出軌道內，需要變化的元素
+            var myCurrTrack = GetCurrentTrack();//目前軌道
+            var myEleList = document.querySelectorAll("#track" + myCurrTrack +" .active");//需要變化的元素
+            
+            //一次一個元素，依序做變化
+            for(var i=0; i< myEleList.length; i++){
+                var wkCurrEle = myEleList[i];//目前元素
+
+                var wkDataAttrList =[]; //記錄所有 data- 相關屬性
+
+                //需要怎麼變化 (都寫在 data- 內了)
+                for(var j=0; j < wkCurrEle.attributes.length; j++){
+                    //屬性名稱
+                    var wkAttrName = wkCurrEle.attributes[j].name;
+                    //找出 data- 相關屬性
+                    var wkRegExp = new RegExp(/data-\d*/);
+                    var wkMatchMark = wkRegExp.test(wkAttrName);
+                    //記錄所有 data- 相關屬性
+                    if(wkMatchMark === true){
+                        wkDataAttrList.push(wkAttrName);
+                    }
+                }
+
+                //單一元素移動檢查
+                var wkCheckResponse = EleMoveCheck(wkCurrEle,wkDataAttrList,TrackMove(myCurrTrack));
+
+                
+
+                //單一元素移動
+                if(wkCheckResponse.ChangeMark === true){
+                    EleMoving(wkCurrEle,wkCheckResponse,TrackMove(myCurrTrack));
+                }
+                else{
+                    //修正頭、尾誤差  (但還是有bug，在跨track 的時候，還是沒辦法變化。只能人工避開，開頭不要設data-0)
+                    //(
+                    //  因為 onscroll 不是每移動1px就觸發一次，而是把好幾次合併成一次。
+                    //  所以移動距離是浮動的可能是 1~100之類的，所以會讓我的程式在頭、尾的時候出現bug
+                    //  明明應該要變化的，但因為不再區間內了，所以最後一次沒變化到
+                    //)
+                    
+                    //處理 data- 資料，變成變化的起點、終點
+                    var myTurnPointList = wkDataAttrList.map(function(item,index){
+                        return item.split('-')[1];
+                    })
+
+                    //判斷目前位置是在開頭、還是結尾
+                    var myMin = Math.abs(TrackMove(myCurrTrack) - myTurnPointList[0]);  
+                    var myMax = Math.abs(TrackMove(myCurrTrack) - myTurnPointList[myTurnPointList.length-1]);  
+                    
+                    if(myMin < myMax){
+                        //改變元素的style
+                        $(wkCurrEle).attr('style',$(wkCurrEle).data(myTurnPointList[0]));
+                    }
+                    else{
+                        
+                        $(wkCurrEle).attr('style',$(wkCurrEle).data(myTurnPointList[myTurnPointList.length-1]));
+                    }
+
+                }
+            }
+        }
+        
+        //單一元素移動檢查
+        function EleMoveCheck(_Element,DataAttr_List,Curr_Move){
+            var myReturn ={
+                ChangeMark:false,
+                Start:0,
+                End:0
+            }
+
+            //處理 data- 資料，變成變化的起點、終點
+            var myTurnPointList = DataAttr_List.map(function(item,index){
+                return item.split('-')[1];
+            })
+
+            var myStart = 0;//變化起點
+            var myEnd = 0;  //變化終點
+            var myChangeMark = false;  //需移動記號
+            //目前在哪的變化區間
+            for(var i = 0; i < myTurnPointList.length - 1; i++){
+                // 起點 < 目前位置  &&  目前位置 < 終點
+                if(myTurnPointList[i] <= Curr_Move && Curr_Move <= myTurnPointList[i+1]){
+                    myStart = myTurnPointList[i];                    
+                    myEnd   = myTurnPointList[i+1];
+                    myChangeMark = true;
+                    break;
+                }
+            }
+
+            myReturn.ChangeMark = myChangeMark;
+            myReturn.Start = myStart;
+            myReturn.End = myEnd;
+
+            return myReturn;
+        }
+
+        //單一元素移動中
+        //參數：起點、終點
+        function EleMoving(_Element,Transform_Info,Curr_Move){
+            var myStart = Transform_Info.Start; //變化起點
+            var myEnd = Transform_Info.End;     //變化終點
+
+            var myTotalDistance = myEnd - myStart;      //總距離
+            var myReadyDistance = Curr_Move - myStart;  //目前已經移動距離
+            
+            var myStartStyle = $(_Element).data(myStart);   //起點 CSS
+            var myEndStyle = $(_Element).data(myEnd);       //終點 CSS
+
+            //找出 CSS 中數字部分，計算出目前位置的數值
+            //起點
+            var myStartNumList = myStartStyle.match(/-?\d+(\.\d+)?/g);
+            //終點
+            var myEndNumList = myEndStyle.match(/-?\d+(\.\d+)?/g);
+            //目前位置，應該要有的數字
+            var myCurrNumList = [];
+            for(var i=0;i < myStartNumList.length;i++){
+                var wkEndNum = parseFloat(myEndNumList[i]);
+                var wkStartNum = parseFloat(myStartNumList[i]);
+                
+                var wkTotalDis = parseFloat(myTotalDistance);                
+                var wkReadyDis = parseFloat(myReadyDistance);
+
+                // 起始位置 + (總變化 / 總距離) * 目前移動距離
+                var wkResult = (wkStartNum + ((wkEndNum - wkStartNum)/wkTotalDis * wkReadyDis)).toFixed(2);
+                myCurrNumList.push(wkResult);
+            }
+
+            //找出文字部分
+            var myCSSTextList = myStartStyle.match(/[^-\d]+/g);
+            var i=0;
+            var myStopMark = false; //停止組文字記號
+            var myNewCssStr = ""; //新的 CSS 文字串
+            //組成目前的 CSS 文字 (因為【文字】的數量一定大於等於【數字】，所以一律從【文字開頭】)
+            while(myStopMark === false){
+                //文字
+                if(myCSSTextList[i] !=undefined){
+                    myNewCssStr += myCSSTextList[i];
+                }
+                //數字
+                if(myCurrNumList[i] !=undefined){
+                    myNewCssStr += myCurrNumList[i];
+                }
+
+                if(myCurrNumList[i] === undefined && myCSSTextList[i]===undefined){
+                    myStopMark = true;
+                }
+                i++;
+            }
+            //改變元素的style
+            $(_Element).attr('style',myNewCssStr);
+        }
+
+    </script>
+
+</head>
+<body>
+    <!-- 第一軌道 (生日快樂 + 滾動視差教學) -->
+    <div id="track1" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <!-- 區塊一 -->
+            <div class="rowOne">
+                <div class="active" data-200="opacity:1" data-500="opacity:0">
+                    <span>請使用電腦瀏覽器看 or 手機橫放看</span>
+                    <span>(往下滑)</span>
+                </div>
+                <div class="hide active" data-600="opacity:0" data-900="opacity:1" data-1700="opacity:1" data-2000="opacity:0">
+                    <span>筱捷，祝妳生日快樂</span>
+                </div>
+                <div class="hide active" data-2100="opacity:0" data-2400="opacity:1">
+                    <span>也沒甚麼能送妳</span>
+                    <span>只能跟往年一樣送卡片</span>
+                </div>
+            </div>
+            <!-- 區塊二 -->
+            <div class="rowTwo">
+                <!-- Scoll 教學 -->
+                <div class="scroll-reminder">
+                    <div class="scroll-icon">
+                        <div class="scroll-dot"></div>
+                    </div>
+                    <div class="explian-text">
+                        scroll
+                    </div>
+                </div>
+            </div>            
+        </div>
+    </div>
+
+    <!-- 第二軌道 (滾動視差，說明 + loading 畫面) -->
+    <div id="track2" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <!-- 滾動視差，說明 -->
+            <div class="rowOne">
+                <div>今年的卡片是一種</div>
+                <div>叫做「滾動視差」的網頁</div>
+                <div>意思是：圖片會隨著下滑做出變化</div>
+                <br/>
+                <div>之前看到 Apple 的官網</div>
+                <div>感覺很有趣，這次就試做了一個看看</div>
+            </div>
+            <!-- loading 進度條 -->
+            <div class="rowTwo">
+                <div class="loadingBar">
+                    <div class="rateBar active" data-200="left:0%;" data-1000="left:100%">
+                        <span>loading. . . </span>
+                    </div>
+                </div>
+            </div>            
+        </div>
+    </div>
+
+    
+    <!-- 第三軌道 (時間過很快) -->
+    <div id="track3" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <div class="morning-background"></div>
+            <div class="night-background active" data-200="opacity:1" data-1000="opacity:0"></div>
+            <div>
+                <img class="moon active" src="./img/moon.png" data-200="transform:translateX(0vw)" data-1000="transform:translateX(100vw)"/>
+                <img class="sun  active" src="./img/sun.svg" data-1000="transform:translateX(-20vw)" data-2000="transform:translateX(70vw)"/>
+                <img class="paris" src="./img/paris.svg"/>
+                <div class="chat-area chat-area3 active">
+                    <div class="active hide" data-200="opacity:0" data-700="opacity:1">
+                        <span>時間過得好快，轉眼間過了五年了</span>
+                        <span>妳現在過得開心嗎？</span>
+                    </div>                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 第四軌道 (想去哪？) -->
+    <div id="track4" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <!-- 雲 -->
+            <img class="track4-cloud" src="./img/clouds.svg"/>
+            <!-- 太陽 -->
+            <img class="sun2" src="./img/sun2.png">
+            <!-- 雪梨 -->
+            <img class="builing1 active" src="./img/sydney.svg" data-200="opacity: 1" data-1000="opacity: 0"/>
+            <!-- 土耳其 -->
+            <img class="builing2 active" src="./img/architecture.svg" data-1000="opacity: 0;" data-1500="opacity: 1" data-2000="opacity: 0"/>
+            <!-- 印度 -->
+            <img class="builing3 active" src="./img/graphic.svg" data-2000="opacity: 0;" data-2500="opacity: 1" data-3000="opacity: 0"/>
+            <!-- 日本(因為圖片的關係，只能放最右邊) -->
+            <img class="builing4 active" src="./img/temple.png" data-3000="opacity: 0;" data-3500="opacity: 1"/>
+            <!-- 行人  走過去 -->
+            <img class="woman active" src="./img/traveler.svg" data-0="left: -20%;" data-3500="left: 90%;"/>
+            <div class="chat-area chat-area4">
+                <div class="active hide" data-200="opacity:0" data-500="opacity:1" data-1300="opacity:1" data-1600="opacity:0">
+                    <span>這兩年因為疫情，打亂了很多人的規劃</span>
+                </div>  
+                <div class="active hide" data-1700="opacity:0" data-2000="opacity:1">
+                    <span>疫情結束後，妳有想去哪走走嗎？</span>
+                </div>                
+            </div>
+        </div>
+    </div>
+
+    <!-- 第五軌道 (想做甚麼？熱氣球)-->
+    <div id="track5" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <img class="track5-cloud" src="./img/clouds.svg"/>
+            <img class="sun2" src="./img/sun2.png">
+            <img class="hotAirBalloon active" src="./img/hotAirBalloon.svg" data-200="transform: translateY(0vw);" data-2000="transform: translateY(-70vw);"/>
+            <div class="chat-area chat-area5">
+                <div>
+                    <span>有想去做甚麼嗎？</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第六軌道 (喜歡的人)-->
+    <div id="track6" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <div class="cover">
+                <img class="love" src="./img/blood-pressure.svg"/>
+            </div>
+            <img class="cat" src="./img/animals.svg"/>
+            <div class="chat-area chat-area6">
+                <div class="active hide" data-200="opacity:0" data-500="opacity:1" data-1300="opacity:1" data-1600="opacity:0">
+                    <span>有想見的人嗎？</span>
+                </div>
+                <div class="active hide" data-1700="opacity:0" data-2000="opacity:1">
+                    <span>有找到合適的另一半了嗎？</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 第七軌道 (想做甚麼2？跳傘)-->
+    <div id="track7" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <div>
+                <img class="track7-cloud" src="./img/clouds.svg"/>
+            </div>
+            <div>
+                <img class="skydiving active" src="./img/skydiving.svg" data-200="transform: rotate(0deg) scale(1,1);" data-3000="transform: rotate(720deg) scale(0,0);"/>
+            </div>
+            <div class="chat-area chat-area7">
+                <div class="active"  data-400="opacity:1" data-900="opacity:0">
+                    <span>不管妳想做甚麼</span>
+                    <span>都祝妳能順利達成</span>
+                </div>
+                <div class="active hide"  data-1000="opacity:0" data-1300="opacity:1" data-2100="opacity:1" data-2400="opacity:0">
+                    <span>不過如果是妳的話</span>
+                    <span>應該甚麼都能做到吧</span>
+                </div>
+                <div class="active hide" data-2500="opacity:0" data-2800="opacity:1">
+                    <span>很有行動力的人</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第八軌道 (結尾，蛋糕) -->
+    <div id="track8" class="track">
+        <!-- 畫面 -->
+        <div class="screen">
+            <!-- 祝福文字 -->
+            <div class="text-area">
+                <div>筱捷最後祝妳</div>
+                <div class="animation-year-text">
+                    <div class="shakeRF">2</div>
+                    <div class="shakeFR">0</div>
+                    <div class="shakeRF">2</div>
+                    <div class="shakeFR">2</div>
+                    <div class="shakeRF">年</div>
+                </div>
+                <div>生日快樂</div>
+                <br/>
+                <div>祝妳接下來的一年，都能開開心心的</div>
+                <div>能找到自己想要的目標</div>
+                <br/>
+                <div>希望未來，我們都能成為更好的人</div>
+                <br/>
+                <div class="end-text">THE EDN</div>
+            </div>
+            <!-- 蛋糕 -->
+            <img class="birthday-cake active" src="./img/birthday.svg" data-200="transform:translateY(0vh)" data-1000="transform:translateY(-65vh)"/>            
+        </div>
+    </div>
+</body>
+</html>
