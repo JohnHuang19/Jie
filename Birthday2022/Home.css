@@ -150,7 +150,7 @@ body{
 }
 #track2 >.screen >.rowTwo{
     display:flex;
-    justify-content: center;
+    align-items: center;
     height: 40%;
 }
 /* 進度條 */
@@ -247,19 +247,19 @@ body{
 
 .builing1{
     width: 70%;
-    bottom:50px;
+    bottom:0;
 }
 
 .builing2{
     width: 50%;
-    bottom:50px;
+    bottom:10%;
     left: 15%;
     opacity: 0;
 }
 
 .builing3{
     width: 70%;
-    bottom:50px;
+    bottom: 5%;
     left: 30%;
     opacity: 0;
 }
@@ -476,7 +476,7 @@ body{
     flex-direction:column;
     justify-content: center;
     align-items: center;
-    font-size: 30px;
+    font-size: 2vw;
 }
 
 /* 會搖晃的年 */
@@ -486,7 +486,7 @@ body{
     align-items: center;
     width: 30%;
     color:#ff0000;
-    font-size: 50px;
+    font-size: 4vw;
 }
 
 .animation-year-text > div{
