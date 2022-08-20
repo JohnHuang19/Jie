@@ -274,7 +274,8 @@ body{
 
 .woman{
     transform: rotateY(180deg);
-    left: -20%;
+    left: 0%;
+    bottom:0px;
 }
 
 .chat-area4{
